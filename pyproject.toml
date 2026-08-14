@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "souladapt"
+version = "0.1.0"
+description = "An adaptation & sincerity layer for AI companions"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+soulmemory = ["soulmemory"]
+
+[tool.setuptools.packages.find]
+include = ["souladapt*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

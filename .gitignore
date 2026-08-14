@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual enviroment
+venv/
+env/
+ENV/
+
+# Package metadata (auto-generated)
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Databases (test files, not code)
+*.db
+*.sqlite
+*.sqlite3
+
+# Enviroment variables
+.env
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# HuggingFace cache
+.cache/
+
+# Pytest & Others archives
+.pytest_cache/
+changelog.txt
