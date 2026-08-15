@@ -8,11 +8,35 @@ class SincerityEngine:
 
     The golden rule: the AI NEVER invents.
     It calibrates its certainty to the real memory signal.
+    Now bilingual: honest in English AND Spanish.
     """
 
     # Thresholds for the three honesty levels
     ASSERTIVE_THRESHOLD = 0.75      # strong match -> state it as fact
     HEDGED_THRESHOLD = 0.45         # weak match -> soften the phrase
+
+    # Honest phrase templates per language
+    PHRASES = {
+        "en": {
+            "hedged": "If I remember correctly: {content}",
+            "admit": (
+                "I don't have a clear memory of that, "
+                "but it might be: {content}"
+            ),
+        },
+        "es": {
+            "hedged": "Si mal no recuerdo: {content}",
+            "admit": "No recuerdo bien eso, pero quizás: {content}",
+        },
+    }
+
+    def __init__(self, lang="en"):
+        """
+        Args:
+            lang: 'en' or 'es' — language used by phrase().
+                  Falls back to 'en' if unknown.
+        """
+        self.lang = lang if lang in self.PHRASES else "en"
 
     def confidence_from_distance(self, distance):
         """
@@ -46,38 +70,23 @@ class SincerityEngine:
 
     def phrase(self, memory_content, confidence):
         """
-        Wrap a memory in an honest sentence, calibrated to how
-        confident the memory actually is.
-
-        Args:
-            memory_content: The memory text to express
-            confidence: The confidence score (0.0–1.0)
-
-        Returns:
-            str: an honestly-phrased sentence
+        Wrap a memory in an honest sentence (in the chosen language),
+        calibrated to how confident the memory actually is.
         """
         level = self.honesty_level(confidence)
 
-        # Strong memory -> say it as a fact, no wrapping
+        # Strong memory → say it as a fact, no wrapping
         if level == "assertive":
             return memory_content
 
-        # Medium memory -> soften it
-        if level == "hedged":
-            return f"If I remember correctly: {memory_content}"
-
-        # Weak memory -> admit uncertainty instead of inventing
-        return (
-            "I don't have a clear memory of that, "
-            f"but it might be: {memory_content}"
+        # Weaker memories → use the honest template for this language
+        return self.PHRASES[self.lang][level].format(
+            content=memory_content
         )
 
     def evaluate(self, recall_results):
         """
         Attach confidence + honesty level to SoulMemory recall results.
-
-        Args:
-            recall_results: The list returned by SoulMemory.recall()
 
         Returns:
             List of dicts with content, confidence and honesty.

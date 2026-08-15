@@ -28,13 +28,15 @@ Most AI companions either **invent memories** or treat every user exactly the sa
 
 ## ✨ Features
 
-| Feature                | Description                                           |
-| ---------------------- | ----------------------------------------------------- |
-| `observe()`            | Learn something about the user                        |
-| `observations()`       | What the companion learned, strongest first           |
-| `forget_observation()` | Unlearn something                                     |
-| `decide()`             | How to respond: style, avoid-list, interests, honesty |
-| `SincerityEngine`      | distance → confidence → assertive / hedged / admit    |
+| Feature                | Description                                                 |
+| ---------------------- | ----------------------------------------------------------- |
+| `observe()`            | Learn something about the user                              |
+| `learn_from()`         | Auto-extract observations from user text (ES/EN)            |
+| `observations()`       | What the companion learned, strongest first                 |
+| `forget_observation()` | Unlearn something                                           |
+| `decide()`             | How to respond: style, avoid-list, interests, honesty, tone |
+| `prompt_context()`     | Ready-to-paste context string for LLM prompts               |
+| `SincerityEngine`      | distance → confidence → assertive / hedged / admit (EN/ES)  |
 
 ## 📦 Installation
 
@@ -82,6 +84,23 @@ confidence ≥ 0.75 → assertive   "You had coffee with Ana."
 ```
 
 The AI never invents: if the memory is weak, it admits it.
+
+## 🎭 Mood-based tone
+
+When connected to a memory with `emotional_timeline()`, `decide()`
+reads the user's current mood and recommends a tone:
+
+sadness / fear -> gentle (soft, warm)
+anger / disgust -> careful (calm, respectful)
+joy / surprise -> energetic (match the energy)
+
+## 🤖 Auto-learning
+
+```python
+adapt.learn_from('Prefiero respuestas cortas')   # -> style
+adapt.learn_from("Me encantan los gatos")        # → interests
+adapt.learn_from("No me hables de política")     # → sensitive
+```
 
 ## 🤝 The contract (duck typing)
 
@@ -139,8 +158,13 @@ python examples/demo_adapt.py   # standalone + connected to SoulMemory
 - [x] Observations (reinforcement learning-lite)
 - [x] `decide()` adaptation layer
 - [x] `SincerityEngine` (3 honesty levels)
+- [x] Auto-learning (`learn_from()`, ES/EN)
+- [x] Mood-based tone adaptation
+- [x] Bilingual sincerity phrases
+- [x] `prompt_context()` for LLM integration
 - [ ] Habit & routine detection
-- [ ] Tone presets (formal / casual / warm)
+- [ ] Observation decay (unlearning over time)
+- [ ] Multi-user support
 
 ## 📄 License
 
