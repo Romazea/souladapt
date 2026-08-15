@@ -37,6 +37,9 @@ Most AI companions either **invent memories** or treat every user exactly the sa
 | `decide()`             | How to respond: style, avoid-list, interests, honesty, tone |
 | `prompt_context()`     | Ready-to-paste context string for LLM prompts               |
 | `SincerityEngine`      | distance → confidence → assertive / hedged / admit (EN/ES)  |
+| `habits()`             | Detect routines from the memory timeline (day + topic)      |
+| `bring_up()`           | Proactive topic suggestions (interests + habits)            |
+| `decay_observations()` | Fade unvalidated observations over time                     |
 
 ## 📦 Installation
 
@@ -102,6 +105,25 @@ adapt.learn_from("Me encantan los gatos")        # → interests
 adapt.learn_from("No me hables de política")     # → sensitive
 ```
 
+## 📅 Habits & proactivity
+
+When connected to a memory with `timeline()`, SoulAdapt notices
+routines and can bring them up like a friend:
+
+```python
+adapt.habits()
+# → [{'day': 'Monday', 'topic': 'running', 'count': 2}]
+
+adapt.bring_up()
+# → ['Le gustan los gatos', 'running (usually on Mondays)']
+```
+
+And like human assumptions, observations that are never re-validated fade away:
+
+```python
+adapt.decay_observations(max_age_days=30)
+```
+
 ## 🤝 The contract (duck typing)
 
 SoulAdapt **never imports SoulMemory**. Any object satisfies the contract if it has:
@@ -143,6 +165,19 @@ Delete an observation: the companion unlearns it.
 
 Decide HOW the AI should respond. Returns style hints, topics to avoid, interests, evaluated memories, confidence and honesty level.
 
+### `habits(min_count=2)`
+
+Detect routines from the connected memory's timeline.
+Returns a list of dicts with day, topic and count.
+
+### `bring_up(limit=2)`
+
+Suggest topics to mention proactively: interests + habits.
+
+### `decay_observations(max_age_days=30, fade=0.2, min_weight=0.3)`
+
+Fade or delete observations not reinforced recently.
+
 ### `close()`
 
 Close the database connection.
@@ -162,9 +197,11 @@ python examples/demo_adapt.py   # standalone + connected to SoulMemory
 - [x] Mood-based tone adaptation
 - [x] Bilingual sincerity phrases
 - [x] `prompt_context()` for LLM integration
-- [ ] Habit & routine detection
-- [ ] Observation decay (unlearning over time)
+- [x] Habit & routine detection
+- [x] Observation decay (unlearning over time)
+- [x] Proactive suggestions (`bring_up()`)
 - [ ] Multi-user support
+- [ ] Unified profile + tone presets
 
 ## 📄 License
 
