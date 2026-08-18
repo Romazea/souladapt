@@ -40,6 +40,9 @@ Most AI companions either **invent memories** or treat every user exactly the sa
 | `habits()`             | Detect routines from the memory timeline (day + topic)      |
 | `bring_up()`           | Proactive topic suggestions (interests + habits)            |
 | `decay_observations()` | Fade unvalidated observations over time                     |
+| `user()`               | Isolated adaptation space per user                          |
+| `list_users()`         | All users with observations                                 |
+| `delete_user()`        | GDPR-style deletion of a user's observations                |
 
 ## 📦 Installation
 
@@ -124,6 +127,28 @@ And like human assumptions, observations that are never re-validated fade away:
 adapt.decay_observations(max_age_days=30)
 ```
 
+### 👥 Multi-user support
+
+Each user gets a fully isolated adaptation space:
+
+```python
+juan = adapt.user('juan')
+ana = adapt.user('ana')
+
+juan.observe('He prefers short answers', category='style')
+ana.decide('hello') # -> only Ana's observations (no leaks)
+
+adapt.list_users() # -> ['ana','juan']
+adapt.delete_user('ana') # GDPR-style full deletion
+```
+
+Combine with SoulMemory per-user for the full companion:
+
+```python
+adapt_juan = adapt.user('juan')
+mem_juan = mem.user('juan') # isolated brains, isolated tact
+```
+
 ## 🤝 The contract (duck typing)
 
 SoulAdapt **never imports SoulMemory**. Any object satisfies the contract if it has:
@@ -178,6 +203,15 @@ Suggest topics to mention proactively: interests + habits.
 
 Fade or delete observations not reinforced recently.
 
+### `user(user_id)`
+
+Get an isolated adaptation space (UserAdapt) for a specific user.
+Same API as SoulAdapt, scoped to one user_id.
+
+### `list_users() / delete_user(user_id)`
+
+Manage users and GDPR-style deletion of observations.
+
 ### `close()`
 
 Close the database connection.
@@ -188,8 +222,9 @@ Close the database connection.
 python examples/demo_adapt.py   # standalone + connected to SoulMemory
 ```
 
-## 🗺️ Roadmap
+**Edit 4** — Reemplaza el Roadmap:
 
+```markdown
 - [x] Observations (reinforcement learning-lite)
 - [x] `decide()` adaptation layer
 - [x] `SincerityEngine` (3 honesty levels)
@@ -200,8 +235,9 @@ python examples/demo_adapt.py   # standalone + connected to SoulMemory
 - [x] Habit & routine detection
 - [x] Observation decay (unlearning over time)
 - [x] Proactive suggestions (`bring_up()`)
-- [ ] Multi-user support
+- [x] Multi-user support
 - [ ] Unified profile + tone presets
+- [ ] JSON backups for observations
 
 ## 📄 License
 
@@ -218,3 +254,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Made with ❤️ as part of the Soul ecosystem**
 
 </div>
+```

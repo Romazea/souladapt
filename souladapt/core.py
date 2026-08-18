@@ -14,6 +14,9 @@ class SoulAdapt:
     calibrates how honest the AI should sound AND which tone
     fits the user's current mood.
 
+    Supports multiple users: each user gets an isolated
+    adaptation space via adapt.user(user_id).
+
     It never imports SoulMemory: any object with a
     .recall(query, limit) method satisfies the contract (duck typing).
     """
@@ -77,22 +80,54 @@ class SoulAdapt:
         self.sincerity = SincerityEngine(lang=lang)
 
     # ------------------------------------------------------------------
+    # Multi-user
+    # ------------------------------------------------------------------
+    def user(self, user_id):
+        """
+        Get an isolated adaptation space for a specific user.
+
+        Args:
+            user_id: Unique identifier for the user
+
+        Returns:
+            A UserAdapt instance scoped to that user
+        """
+        return UserAdapt(self, user_id)
+
+    def list_users(self):
+        """List all user IDs that have observations."""
+        return self.backend.list_users()
+
+    def delete_user(self, user_id):
+        """
+        Delete a user and ALL their observations.
+
+        Returns:
+            Number of observations deleted
+        """
+        return self.backend.delete_user(user_id)
+
+    # ------------------------------------------------------------------
     # Learning: what the companion knows about the user
     # ------------------------------------------------------------------
-    def observe(self, content, category="general"):
+    def observe(self, content, category="general",
+                user_id="default"):
         """
-        Register something learned about the user.
+        Register something learned about a user.
 
         Args:
             content: What was learned ("prefiere respuestas cortas")
             category: 'style', 'sensitive', 'interests' or 'general'
+            user_id: Owner of the observation
 
         Returns:
             The observation ID
         """
-        return self.backend.add_observation(content, category)
+        return self.backend.add_observation(
+            content, category, user_id=user_id
+        )
 
-    def learn_from(self, text):
+    def learn_from(self, text, user_id="default"):
         """
         Auto-extract an observation from user text (ES/EN rules).
         The companion learns by itself, no babysitting needed.
@@ -103,12 +138,14 @@ class SoulAdapt:
         lower = text.lower()
         for category, triggers in self.LEARN_RULES:
             if any(t in lower for t in triggers):
-                return self.backend.add_observation(text, category)
+                return self.backend.add_observation(
+                    text, category, user_id=user_id
+                )
         return None
 
-    def observations(self, category=None):
-        """Get learned observations, strongest first."""
-        return self.backend.get_observations(category)
+    def observations(self, category=None, user_id="default"):
+        """Get learned observations of a user, strongest first."""
+        return self.backend.get_observations(category, user_id)
 
     def forget_observation(self, observation_id):
         """Delete an observation: the companion unlearns it."""
@@ -117,7 +154,7 @@ class SoulAdapt:
     # ------------------------------------------------------------------
     # Deciding: how the AI should respond
     # ------------------------------------------------------------------
-    def decide(self, query, limit=3):
+    def decide(self, query, limit=3, user_id="default"):
         """
         Decide HOW the AI should respond to a query.
 
@@ -128,15 +165,21 @@ class SoulAdapt:
         decision = {
             "style": [
                 o["content"]
-                for o in self.backend.get_observations("style")
+                for o in self.backend.get_observations(
+                    "style", user_id
+                )
             ],
             "avoid": [
                 o["content"]
-                for o in self.backend.get_observations("sensitive")
+                for o in self.backend.get_observations(
+                    "sensitive", user_id
+                )
             ],
             "interests": [
                 o["content"]
-                for o in self.backend.get_observations("interests")
+                for o in self.backend.get_observations(
+                    "interests", user_id
+                )
             ],
             "memories": [],
             "confidence": None,
@@ -166,12 +209,12 @@ class SoulAdapt:
 
         return decision
 
-    def prompt_context(self, query, limit=3):
+    def prompt_context(self, query, limit=3, user_id="default"):
         """
         Build a ready-to-paste context string for an LLM
         system prompt: adaptation + sincerity in one line.
         """
-        d = self.decide(query, limit=limit)
+        d = self.decide(query, limit, user_id=user_id)
         parts = []
         if d["style"]:
             parts.append("Style: " + "; ".join(d["style"]))
@@ -187,37 +230,9 @@ class SoulAdapt:
                 parts.append(f"Fact: {m['content']}")
             elif m["honesty"] == "hedged":
                 parts.append(f"Uncertain: {m['content']}")
-        habits = self.habits()
-        if habits:
-            routine = ", ".join(
-                f"{h['topic']} on {h['day']}s" for h in habits[:2]
-            )
-            parts.append("Routine: " + routine)
-
         if not parts:
             return "No adaptation data yet."
         return " | ".join(parts)
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-    def _detect_mood(self):
-        """
-        Read the user's dominant emotion this week from the memory.
-        Duck typing: uses emotional_timeline() if the memory has it.
-
-        Returns:
-            The dominant emotion string, or None if unavailable.
-        """
-        if self.memory is None:
-            return None
-        if not hasattr(self.memory, "emotional_timeline"):
-            return None
-        timeline = self.memory.emotional_timeline(weeks=1)
-        if not timeline:
-            return None
-        # Last entry is the current week
-        return timeline[-1]["dominant_emotion"]
 
     # ------------------------------------------------------------------
     # Insights: habits, proactivity & maintenance
@@ -249,7 +264,7 @@ class SoulAdapt:
             if count >= min_count
         ]
 
-    def bring_up(self, limit=2):
+    def bring_up(self, limit=2, user_id="default"):
         """
         Suggest topics the companion could mention proactively:
         strong interests + detected routines. A friend who
@@ -257,7 +272,9 @@ class SoulAdapt:
         """
         suggestions = [
             o["content"]
-            for o in self.backend.get_observations("interests")
+            for o in self.backend.get_observations(
+                "interests", user_id
+            )
         ][:limit]
         for habit in self.habits():
             if len(suggestions) >= limit:
@@ -268,7 +285,7 @@ class SoulAdapt:
         return suggestions[:limit]
 
     def decay_observations(self, max_age_days=30, fade=0.2,
-                           min_weight=0.3):
+                           min_weight=0.3, user_id="default"):
         """
         Fade observations not reinforced recently: what the
         companion "assumes" must be re-validated, like humans.
@@ -279,7 +296,7 @@ class SoulAdapt:
         now = int(time.time())
         max_age = max_age_days * 86400
         removed = 0
-        for o in self.backend.get_observations():
+        for o in self.backend.get_observations(None, user_id):
             if now - o["last_seen"] > max_age:
                 new_weight = o["weight"] - fade
                 if new_weight < min_weight:
@@ -292,6 +309,24 @@ class SoulAdapt:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+    def _detect_mood(self):
+        """
+        Read the user's dominant emotion this week from the memory.
+        Duck typing: uses emotional_timeline() if the memory has it.
+
+        Returns:
+            The dominant emotion string, or None if unavailable.
+        """
+        if self.memory is None:
+            return None
+        if not hasattr(self.memory, "emotional_timeline"):
+            return None
+        timeline = self.memory.emotional_timeline(weeks=1)
+        if not timeline:
+            return None
+        # Last entry is the current week
+        return timeline[-1]["dominant_emotion"]
+
     def _topics(self, text):
         """Extract meaningful lowercase topics from a text."""
         return [
@@ -304,3 +339,50 @@ class SoulAdapt:
     def close(self):
         """Close the adaptation database connection."""
         self.backend.close()
+
+
+class UserAdapt:
+    """
+    An isolated adaptation space for a single user.
+    Same API as SoulAdapt, scoped to one user_id.
+    """
+
+    def __init__(self, parent, user_id):
+        self._parent = parent
+        self.user_id = user_id
+
+    def observe(self, content, category="general"):
+        return self._parent.observe(
+            content, category, user_id=self.user_id
+        )
+
+    def learn_from(self, text):
+        return self._parent.learn_from(text, user_id=self.user_id)
+
+    def observations(self, category=None):
+        return self._parent.observations(category, user_id=self.user_id)
+
+    def forget_observation(self, observation_id):
+        return self._parent.forget_observation(observation_id)
+
+    def decide(self, query, limit=3):
+        return self._parent.decide(
+            query, limit, user_id=self.user_id
+        )
+
+    def prompt_context(self, query, limit=3):
+        return self._parent.prompt_context(
+            query, limit, user_id=self.user_id
+        )
+
+    def habits(self, min_count=2):
+        return self._parent.habits(min_count)
+
+    def bring_up(self, limit=2):
+        return self._parent.bring_up(limit, user_id=self.user_id)
+
+    def decay_observations(self, max_age_days=30, fade=0.2,
+                           min_weight=0.3):
+        return self._parent.decay_observations(
+            max_age_days, fade, min_weight, user_id=self.user_id
+        )
