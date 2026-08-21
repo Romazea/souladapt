@@ -1,3 +1,4 @@
+import json
 import time
 from collections import Counter
 
@@ -66,7 +67,16 @@ class SoulAdapt:
         "Friday", "Saturday", "Sunday"
     ]
 
-    def __init__(self, db_path="souladapt.db", memory=None, lang="en"):
+    # Base personality presets: how the companion sounds by default
+    TONE_PRESETS = {
+        "formal": "polite, structured, respectful",
+        "casual": "relaxed, friendly, informal",
+        "warm": "affectionate, supportive, close",
+        "direct": "brief, honest, to the point",
+    }
+
+    def __init__(self, db_path="souladapt.db", memory=None,
+                 lang="en", preset="casual"):
         """
         Args:
             db_path: Path to the adaptation database
@@ -74,10 +84,16 @@ class SoulAdapt:
                 If provided, its recall() distances calibrate
                 sincerity and its emotional_timeline() sets the tone.
             lang: 'en' or 'es' — language for sincerity phrases
+            preset: Base personality tone ('formal', 'casual',
+                'warm' or 'direct'). Falls back to 'casual'.
         """
         self.backend = SQLiteBackend(db_path)
         self.memory = memory
         self.sincerity = SincerityEngine(lang=lang)
+        # Base personality tone (the mood can override the energy)
+        self.preset = (
+            preset if preset in self.TONE_PRESETS else "casual"
+        )
 
     # ------------------------------------------------------------------
     # Multi-user
@@ -185,7 +201,9 @@ class SoulAdapt:
             "confidence": None,
             "honesty": "neutral",
             "mood": None,
-            "tone": "neutral"
+            "tone": "neutral",
+            "preset": self.preset,
+            "preset_hint": self.TONE_PRESETS[self.preset]
         }
 
         # If connected to a memory, calibrate sincerity + tone
@@ -233,6 +251,113 @@ class SoulAdapt:
         if not parts:
             return "No adaptation data yet."
         return " | ".join(parts)
+
+    # ------------------------------------------------------------------
+    # Profile, presets & backups
+    # ------------------------------------------------------------------
+    def set_preset(self, preset):
+        """
+        Change the companion's base personality tone.
+
+        Returns:
+            True if the preset exists, False otherwise
+        """
+        if preset in self.TONE_PRESETS:
+            self.preset = preset
+            return True
+        return False
+
+    def profile(self, user_id="default"):
+        """
+        Generate an adaptation summary of the user
+        (the SoulAdapt version of SoulMemory.reflect()).
+
+        Returns:
+            dict with observation_count, style, sensitive,
+            interests and a human-readable summary
+        """
+        obs = self.backend.get_observations(None, user_id)
+        if not obs:
+            return {
+                "observation_count": 0,
+                "style": [],
+                "sensitive": [],
+                "interests": [],
+                "summary": "No observations yet. A stranger."
+            }
+        style = [
+            o["content"] for o in obs if o["category"] == "style"
+        ]
+        sensitive = [
+            o["content"] for o in obs if o["category"] == "sensitive"
+        ]
+        interests = [
+            o["content"] for o in obs if o["category"] == "interests"
+        ]
+        parts = [f"{len(obs)} observations"]
+        if style:
+            parts.append(f"style: {', '.join(style[:2])}")
+        if interests:
+            parts.append(f"loves: {', '.join(interests[:2])}")
+        if sensitive:
+            parts.append(f"avoids: {', '.join(sensitive[:2])}")
+        return {
+            "observation_count": len(obs),
+            "style": style,
+            "sensitive": sensitive,
+            "interests": interests,
+            "summary": "Knows you: " + " | ".join(parts) + "."
+        }
+
+    def export_json(self, path="souladapt_backup.json", user_id=None):
+        """
+        Export all observations to a JSON backup.
+
+        Returns:
+            Number of observations exported
+        """
+        rows = self.backend.export_rows(user_id)
+        observations = [
+            {
+                "content": r[1],
+                "category": r[2],
+                "weight": r[3],
+                "user_id": r[4],
+                "created_at": r[5],
+                "last_seen": r[6],
+                "times_seen": r[7]
+            }
+            for r in rows
+        ]
+        data = {
+            "format": "souladapt-backup",
+            "version": "0.5.0",
+            "exported_at": int(time.time()),
+            "observations": observations
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return len(observations)
+
+    def import_json(self, path):
+        """
+        Restore observations from a JSON backup.
+
+        Returns:
+            Number of observations restored
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        restored = 0
+        for item in data.get("observations", []):
+            self.backend.add_observation(
+                item["content"],
+                category=item.get("category", "general"),
+                weight=item.get("weight", 1.0),
+                user_id=item.get("user_id", "default")
+            )
+            restored += 1
+        return restored
 
     # ------------------------------------------------------------------
     # Insights: habits, proactivity & maintenance
@@ -386,3 +511,12 @@ class UserAdapt:
         return self._parent.decay_observations(
             max_age_days, fade, min_weight, user_id=self.user_id
         )
+
+    def profile(self):
+        return self._parent.profile(user_id=self.user_id)
+
+    def export_json(self, path="souladapt_backup.json"):
+        return self._parent.export_json(path, user_id=self.user_id)
+
+    def import_json(self, path):
+        return self._parent.import_json(path)

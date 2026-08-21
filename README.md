@@ -28,21 +28,24 @@ Most AI companions either **invent memories** or treat every user exactly the sa
 
 ## ✨ Features
 
-| Feature                | Description                                                 |
-| ---------------------- | ----------------------------------------------------------- |
-| `observe()`            | Learn something about the user                              |
-| `learn_from()`         | Auto-extract observations from user text (ES/EN)            |
-| `observations()`       | What the companion learned, strongest first                 |
-| `forget_observation()` | Unlearn something                                           |
-| `decide()`             | How to respond: style, avoid-list, interests, honesty, tone |
-| `prompt_context()`     | Ready-to-paste context string for LLM prompts               |
-| `SincerityEngine`      | distance → confidence → assertive / hedged / admit (EN/ES)  |
-| `habits()`             | Detect routines from the memory timeline (day + topic)      |
-| `bring_up()`           | Proactive topic suggestions (interests + habits)            |
-| `decay_observations()` | Fade unvalidated observations over time                     |
-| `user()`               | Isolated adaptation space per user                          |
-| `list_users()`         | All users with observations                                 |
-| `delete_user()`        | GDPR-style deletion of a user's observations                |
+| Feature                           | Description                                                 |
+| --------------------------------- | ----------------------------------------------------------- |
+| `observe()`                       | Learn something about the user                              |
+| `learn_from()`                    | Auto-extract observations from user text (ES/EN)            |
+| `observations()`                  | What the companion learned, strongest first                 |
+| `forget_observation()`            | Unlearn something                                           |
+| `decide()`                        | How to respond: style, avoid-list, interests, honesty, tone |
+| `prompt_context()`                | Ready-to-paste context string for LLM prompts               |
+| `SincerityEngine`                 | distance → confidence → assertive / hedged / admit (EN/ES)  |
+| `habits()`                        | Detect routines from the memory timeline (day + topic)      |
+| `bring_up()`                      | Proactive topic suggestions (interests + habits)            |
+| `decay_observations()`            | Fade unvalidated observations over time                     |
+| `user()`                          | Isolated adaptation space per user                          |
+| `list_users()`                    | All users with observations                                 |
+| `delete_user()`                   | GDPR-style deletion of a user's observations                |
+| `profile()`                       | Adaptation summary: style, interests, sensitive, summary    |
+| `set_preset()`                    | Base personality: formal / casual / warm / direct           |
+| `export_json()` / `import_json()` | JSON backups of observations                                |
 
 ## 📦 Installation
 
@@ -142,11 +145,42 @@ adapt.list_users() # -> ['ana','juan']
 adapt.delete_user('ana') # GDPR-style full deletion
 ```
 
+### 🎭 Personality presets
+
+The companion's base tone, independent of the mood:
+
+````python
+adapt = SoulAdapt("adapt.db", preset="warm")
+# formal → polite, structured, respectful
+# casual → relaxed, friendly, informal (default)
+# warm   → affectionate, supportive, close
+# direct → brief, honest, to the point
+
+adapt.set_preset("direct")  # change it anytime
+
 Combine with SoulMemory per-user for the full companion:
 
 ```python
 adapt_juan = adapt.user('juan')
 mem_juan = mem.user('juan') # isolated brains, isolated tact
+````
+
+## Adaptation profile
+
+A human-redeable summary of what the companion knows about you:
+
+```python
+adapt.profile()
+adapt.profile()
+# → {'observation_count': 3, 'style': [...], 'interests': [...],
+#    'sensitive': [...], 'summary': 'Knows you: ...'}
+```
+
+## JSON backups
+
+```python
+adapt.export_json("backup.json")   # all observations (or per user)
+adapt.import_json("backup.json")   # restore them
 ```
 
 ## 🤝 The contract (duck typing)
@@ -212,6 +246,20 @@ Same API as SoulAdapt, scoped to one user_id.
 
 Manage users and GDPR-style deletion of observations.
 
+`SoulAdapt(db_path="souladapt.db", memory=None, lang="en", preset="casual")`
+
+### `set_preset(preset)`
+
+Change the base personality tone. Returns True if the preset exists.
+
+### `profile(user_id="default")`
+
+Adaptation summary of the user: counts, categories and summary.
+
+### `export_json(path="souladapt_backup.json", user_id=None)` / `import_json(path)`
+
+JSON backups of observations (per-user supported).
+
 ### `close()`
 
 Close the database connection.
@@ -222,9 +270,8 @@ Close the database connection.
 python examples/demo_adapt.py   # standalone + connected to SoulMemory
 ```
 
-**Edit 4** — Reemplaza el Roadmap:
+````
 
-```markdown
 - [x] Observations (reinforcement learning-lite)
 - [x] `decide()` adaptation layer
 - [x] `SincerityEngine` (3 honesty levels)
@@ -236,8 +283,9 @@ python examples/demo_adapt.py   # standalone + connected to SoulMemory
 - [x] Observation decay (unlearning over time)
 - [x] Proactive suggestions (`bring_up()`)
 - [x] Multi-user support
-- [ ] Unified profile + tone presets
-- [ ] JSON backups for observations
+- [x] Personality presets
+- [x] Adaptation profile (`profile()`)
+- [x] JSON backups for observations
 
 ## 📄 License
 
@@ -255,3 +303,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 </div>
 ```
+````

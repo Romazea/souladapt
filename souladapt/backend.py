@@ -146,6 +146,23 @@ class SQLiteBackend:
         self.db.execute("DELETE FROM observations")
         self.db.commit()
 
+    def export_rows(self, user_id=None):
+        """Get observations including user_id, for JSON export"""
+        if user_id is None:
+            rows = self.db.execute(
+                "SELECT id, content, category, weight, user_id, "
+                "created_at, last_seen, times_seen "
+                "FROM observations ORDER BY id"
+            ).fetchall()
+        else:
+            rows = self.db.execute(
+                "SELECT id, content, category, weight, user_id, "
+                "created_at, last_seen, times_seen "
+                "FROM observations WHERE user_id = ? ORDER BY id",
+                (user_id,)
+            ).fetchall()
+        return rows
+
     def close(self):
         """Close the database connection"""
         self.db.close()
